@@ -1,0 +1,29 @@
+¿Qué información necesitan registrar de cada socio? (Nombre, contacto, estado físico, etc.)
+
+¿Cómo identifican a un socio? ¿Usan un número de membresía, DNI, correo electrónico?
+
+¿Los socios pueden estar activos en más de una sucursal al mismo tiempo?
+
+¿Cómo manejan el estado de pagos? ¿Es suficiente saber si está al día o necesitan historial de pagos?
+
+¿Desean llevar registro de las asistencias o visitas a las sucursales?
+
+¿Qué tipo de retos o actividades se ofrecen para ganar puntos?
+
+¿Cómo se otorgan los puntos? ¿Manual o automáticamente por acciones (asistencias, compras, metas)?
+
+¿Qué pueden canjear los socios con sus puntos? ¿Hay catálogo de premios?
+
+¿Hay límites o reglas para el uso de puntos (por tiempo, por cantidad, etc.)?
+
+¿Quieren hacer seguimiento de metas individuales (peso, frecuencia, logros)?
+
+¿Todas las sucursales comparten el mismo sistema o cada una tiene su propio control?
+
+¿Qué restricciones deben aplicarse cuando un socio entrena en otra sucursal?
+
+¿Se requiere autorización previa para usar una sucursal diferente?
+
+¿Quieren registrar el historial de entrenamientos por sucursal?
+
+¿Los entrenadores o servicios varían entre sucursales y deben reflejarse en el sistema?
