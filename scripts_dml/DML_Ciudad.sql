@@ -1,5 +1,5 @@
 -- Script DML para la tabla Ciudad
--- Fecha de generación: 2025-05-03 08:05:19.812622
+-- Fecha de generación: 2025-05-12 00:11:17.203152
 -- Total de registros: 6
 
 INSERT INTO dbo.Ciudad (IDCiudad, Nombre, IDPais) VALUES
