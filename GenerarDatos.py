@@ -1,4 +1,5 @@
 import random
+import os
 from datetime import datetime, timedelta, date
 from faker import Faker
 from collections import defaultdict
@@ -33,18 +34,21 @@ class FitChainDataGenerator:
         self.unidad_medicion = []
         self.pais = []
         self.ciudad = []
-        self.sucursal = []
-        self.miembro = []
-        self.grupo = []
-        self.reto = []
-        self.membresia = []
+        self.sucursales = []  # Cambiado de sucursal a sucursales para consistencia
+        self.miembros = []    # Cambiado de miembro a miembros para consistencia
+        self.grupos = []      # Cambiado de grupo a grupos para consistencia
+        self.retos = []       # Cambiado de reto a retos para consistencia
+        self.membresias = []  # Cambiado de membresia a membresias para consistencia
         self.miembro_grupo = []
         self.reto_grupal = []
         self.miembro_reto = []
-        self.asistencia = []
-        self.origen = []
-        self.punteo = []
-        self.pago = []
+        self.asistencias = []  # Cambiado de asistencia a asistencias para consistencia
+        self.origenes = []     # Cambiado de origen a origenes para consistencia
+        self.punteos = []      # Cambiado de punteo a punteos para consistencia
+        self.pagos = []        # Cambiado de pago a pagos para consistencia
+        self.miembro_sucursal = []
+        self.canjes = []       # Añadido para la tabla Canje
+        self.sesiones_virtuales = [] # Añadido para la tabla Sesion_virtual
 
         # Configurar semillas para reproducibilidad
         self._configurar_semillas()
@@ -69,7 +73,7 @@ class FitChainDataGenerator:
 
     def _obtener_sucursales_miembro(self, id_miembro):
         """Obtiene todas las sucursales a las que pertenece un miembro"""
-        return [m['IDSucursal'] for m in self.membresia
+        return [m['IDSucursal'] for m in self.miembro_sucursal
                 if m['IDMiembro'] == id_miembro and
                 (m['Fecha_cancelacion'] is None or m['Fecha_cancelacion'] > self.fecha_actual)]
 
@@ -85,7 +89,7 @@ class FitChainDataGenerator:
             bool: True si el miembro puede participar, False si no
         """
         # Obtener el reto
-        reto = next(r for r in self.reto if r['IDReto'] == id_reto)
+        reto = next(r for r in self.retos if r['IDReto'] == id_reto)
 
         # Si el reto es global (sin sucursal), cualquier miembro puede participar
         if reto['IDSucursal'] is None:
@@ -108,8 +112,8 @@ class FitChainDataGenerator:
 
         # Tipos de membresía
         self.tipo_membresia = [
-            {"IDTipoMembresia": 1, "Nombre": "Básica"},
-            {"IDTipoMembresia": 2, "Nombre": "Premium"}
+            {"IDTipo_Membresia": 1, "Nombre": "Básica"},
+            {"IDTipo_Membresia": 2, "Nombre": "Premium"}
         ]
 
         # Estados
@@ -190,10 +194,12 @@ class FitChainDataGenerator:
         """Genera datos para grupos"""
         self.grupos = []
         for i in range(1, self.num_grupos + 1):
+            sucursal = random.choice(self.sucursales)
             self.grupos.append({
                 "IDGrupo": i,
                 "Nombre": f"Grupo {self.fake.word().capitalize()}",
-                "Fecha_creacion": self._random_date(self.fecha_inicio, self.fecha_actual)
+                "Fecha_creacion": self._random_date(self.fecha_inicio, self.fecha_actual),
+                "IDSucursal": sucursal["IDSucursal"]
             })
 
     def _generar_retos(self):
@@ -219,12 +225,12 @@ class FitChainDataGenerator:
 
     # Generación de datos relacionales
     def _generar_membresias(self):
-        """Genera datos para membresías (ahora separado de Miembro_Sucursal)"""
+        """Genera datos para membresías"""
         self.membresias = []
         id_membresia = 1
         for miembro in self.miembros:
             num_membresias = random.randint(1, 2)  # 1-2 membresías por miembro
-            tipos = random.sample(self.tipo_membresia, num_membresias)
+            tipos = random.sample(self.tipo_membresia, min(num_membresias, len(self.tipo_membresia)))
 
             for tipo in tipos:
                 fecha_inicio = self._random_date(miembro["Fecha_registro"], self.fecha_actual)
@@ -240,13 +246,13 @@ class FitChainDataGenerator:
                 id_membresia += 1
 
     def _generar_miembro_sucursal(self):
-        """Genera la relación Miembro-Sucursal (antes parte de Membresía)"""
+        """Genera la relación Miembro-Sucursal"""
         self.miembro_sucursal = []
         id_miembro_sucursal = 1
 
         for miembro in self.miembros:
-            num_sucursales = random.randint(1, 3)
-            sucursales = random.sample(self.sucursales, num_sucursales)
+            num_sucursales = random.randint(1, 3)  # Máximo 3 sucursales por miembro según los requerimientos
+            sucursales = random.sample(self.sucursales, min(num_sucursales, len(self.sucursales)))
 
             for i, sucursal in enumerate(sucursales):
                 fecha_inicio = self._random_date(miembro["Fecha_registro"], self.fecha_actual)
@@ -268,6 +274,7 @@ class FitChainDataGenerator:
         """Genera datos para relación miembro-grupo"""
         self.miembro_grupo = []
         for grupo in self.grupos:
+            # Máximo 20 miembros por grupo según los requerimientos
             num_miembros = random.randint(5, 20)
             miembros_grupo = random.sample(self.miembros, min(num_miembros, len(self.miembros)))
 
@@ -277,12 +284,19 @@ class FitChainDataGenerator:
                 if random.random() > 0.7:
                     fecha_salida = self._random_date(fecha_entrada, self.fecha_actual)
 
+                # Solo miembros con +3 meses pueden ser líderes según los requerimientos
+                es_lider = False
+                if i == 0:  # Potencial líder
+                    tiempo_en_fitchain = (self.fecha_actual - miembro["Fecha_registro"]).days
+                    if tiempo_en_fitchain >= 90:  # Al menos 3 meses (90 días)
+                        es_lider = True
+
                 self.miembro_grupo.append({
                     "IDGrupo": grupo["IDGrupo"],
                     "IDMiembro": miembro["IDMiembro"],
                     "Fecha_entrada": fecha_entrada,
                     "Fecha_salida": fecha_salida,
-                    "esLider": i == 0  # El primero es líder
+                    "esLider": es_lider
                 })
 
     def _generar_reto_grupal(self):
@@ -314,7 +328,7 @@ class FitChainDataGenerator:
         self.miembro_reto = []
         for reto in self.retos:
             # Determinar cuántos participantes tendrá este reto
-            num_participantes = random.randint(5, len(self.miembros))
+            num_participantes = random.randint(5, min(25, len(self.miembros)))
 
             # Filtrar miembros elegibles para este reto
             if reto['IDSucursal'] is None:
@@ -372,7 +386,6 @@ class FitChainDataGenerator:
                     self.asistencias.append({
                         "IDAsistencia": id_asistencia,
                         "IDMiembro_Sucursal": ms["IDMiembro_Sucursal"],
-                        "IDSucursal": ms["IDSucursal"],
                         "FechaHora_Entrada": fecha_entrada,
                         "FechaHora_Salida": fecha_salida,
                         "Acceso": random.randint(1, 3)
@@ -380,11 +393,11 @@ class FitChainDataGenerator:
                     id_asistencia += 1
 
     def _generar_origenes(self):
-        """Genera orígenes de puntos por retos (simplificado)"""
+        """Genera orígenes de puntos (retos y asistencias)"""
         self.origenes = []
         id_origen = 1
 
-        # Orígenes solo por retos (eliminado el de asistencias según nuevo DDL)
+        # Orígenes para retos
         for reto in self.retos:
             self.origenes.append({
                 "IDOrigen": id_origen,
@@ -392,9 +405,11 @@ class FitChainDataGenerator:
                 "IDReto": reto["IDReto"]
             })
             id_origen += 1
+        
+        # Origen para asistencia
         self.origenes.append({
             "IDOrigen": id_origen,
-            "Descripcion": f"Asistencia",
+            "Descripcion": "Asistencia",
             "IDReto": None
         })
 
@@ -403,47 +418,94 @@ class FitChainDataGenerator:
         self.punteos = []
         id_punteo = 1
 
+        # Punteos por retos completados
         for origen in [o for o in self.origenes if o['IDReto'] is not None]:
             reto = next(r for r in self.retos if r['IDReto'] == origen['IDReto'])
             participantes = [mr for mr in self.miembro_reto
                              if mr['IDReto'] == reto['IDReto'] and mr['IDEstado'] == 2]  # Completado
 
             for participante in participantes:
+                # Fecha de vencimiento: 12 meses después según requerimientos
+                fecha_vencimiento = participante["Fecha_completado"].date() + timedelta(days=365)
+                
                 self.punteos.append({
                     "IDPunteo": id_punteo,
                     "Cantidad": reto["Puntos_aganar"],
                     "Fecha_obtenido": participante["Fecha_completado"].date(),
-                    "Fecha_vencido": participante["Fecha_completado"].date() + timedelta(days=90),
+                    "Fecha_vencido": fecha_vencimiento,
                     "IDOrigen": origen["IDOrigen"],
-                    "IDMiembro": participante["IDMiembro"]
+                    "IDMiembro": participante["IDMiembro"],
+                    "estaActivo": fecha_vencimiento > self.fecha_actual.date()
                 })
                 id_punteo += 1
+        
+        # Puntos por asistencia regular (8+ veces al mes)
+        origen_asistencia = next(o for o in self.origenes if o['Descripcion'] == "Asistencia")
+        
+        # Agrupar asistencias por miembro y mes
+        asistencias_por_miembro_mes = defaultdict(lambda: defaultdict(int))
+        for asistencia in self.asistencias:
+            ms = next(m for m in self.miembro_sucursal if m['IDMiembro_Sucursal'] == asistencia['IDMiembro_Sucursal'])
+            miembro_id = ms['IDMiembro']
+            mes_clave = f"{asistencia['FechaHora_Entrada'].year}-{asistencia['FechaHora_Entrada'].month}"
+            asistencias_por_miembro_mes[miembro_id][mes_clave] += 1
+        
+        # Otorgar puntos por asistencia regular
+        for miembro_id, meses in asistencias_por_miembro_mes.items():
+            for mes_clave, conteo in meses.items():
+                if conteo >= 8:  # Si asistió 8 o más veces en el mes
+                    año, mes = map(int, mes_clave.split("-"))
+                    ultimo_dia_mes = 28
+                    if mes in [1, 3, 5, 7, 8, 10, 12]:
+                        ultimo_dia_mes = 31
+                    elif mes in [4, 6, 9, 11]:
+                        ultimo_dia_mes = 30
+                    
+                    fecha_obtenido = date(año, mes, ultimo_dia_mes)
+                    fecha_vencimiento = fecha_obtenido + timedelta(days=365)
+                    
+                    self.punteos.append({
+                        "IDPunteo": id_punteo,
+                        "Cantidad": 50,  # Puntos arbitrarios por asistencia regular
+                        "Fecha_obtenido": fecha_obtenido,
+                        "Fecha_vencido": fecha_vencimiento,
+                        "IDOrigen": origen_asistencia["IDOrigen"],
+                        "IDMiembro": miembro_id,
+                        "estaActivo": fecha_vencimiento > self.fecha_actual.date()
+                    })
+                    id_punteo += 1
 
     def _generar_pagos(self):
         """Genera pagos mensuales en los primeros 10 días de cada mes"""
         self.pagos = []
         id_pago = 1
 
-        for miembro in self.miembros:
+        for membresia in self.membresias:
             # Calcular meses de membresía
-            fecha_inicio = miembro["Fecha_registro"]
-            fecha_fin = self.fecha_actual
+            fecha_inicio = membresia["Fecha_Inicio"]
+            fecha_fin = membresia["Fecha_fin"]
+            if fecha_fin > self.fecha_actual:
+                fecha_fin = self.fecha_actual
 
             current_date = fecha_inicio.replace(day=1)
             while current_date <= fecha_fin:
                 if current_date >= fecha_inicio:
-                    dia_pago = random.randint(1, 10)
+                    dia_pago = random.randint(1, 10)  # Según requerimientos, pago en primeros 10 días
                     fecha_pago = current_date.replace(day=dia_pago)
 
                     if fecha_pago > fecha_fin:
                         break
 
-                    monto = round(random.uniform(20.0, 100.0), 2)
+                    # Diferente precio según tipo de membresía
+                    base_monto = 30.0 if membresia["IDTipo_Membresia"] == 1 else 50.0  # Básica vs Premium
+                    variacion = random.uniform(0.8, 1.2)
+                    monto = round(base_monto * variacion, 2)
+                    
                     self.pagos.append({
                         "IDPago": id_pago,
                         "Fecha_trasaccion": fecha_pago,
                         "Monto_abonado": monto,
-                        "IDMiembro": miembro["IDMiembro"]
+                        "IDMembresia": membresia["IDMembresia"]
                     })
                     id_pago += 1
 
@@ -452,6 +514,93 @@ class FitChainDataGenerator:
                     current_date = current_date.replace(year=current_date.year + 1, month=1)
                 else:
                     current_date = current_date.replace(month=current_date.month + 1)
+
+    def _generar_canjes(self):
+        """Genera canjes de puntos en sucursales registradas"""
+        self.canjes = []
+        id_canje = 1
+        
+        # Porcentaje de miembros que canjean puntos
+        porcentaje_canje = 0.3
+        miembros_canjeadores = random.sample(self.miembros, int(len(self.miembros) * porcentaje_canje))
+        
+        for miembro in miembros_canjeadores:
+            # Verificar si tiene puntos para canjear
+            puntos_miembro = [p for p in self.punteos if p['IDMiembro'] == miembro['IDMiembro'] and p['estaActivo']]
+            if not puntos_miembro:
+                continue
+                
+            # Calcular puntos disponibles
+            puntos_disponibles = sum(p['Cantidad'] for p in puntos_miembro)
+            if puntos_disponibles < 100:  # Umbral mínimo para canje
+                continue
+                
+            # Determinar sucursales donde el miembro está registrado
+            sucursales_miembro = self._obtener_sucursales_miembro(miembro['IDMiembro'])
+            if not sucursales_miembro:
+                continue
+                
+            # Generar entre 1-3 canjes por miembro
+            num_canjes = random.randint(1, 3)
+            for _ in range(num_canjes):
+                # Seleccionar una sucursal aleatoria donde está registrado
+                sucursal_id = random.choice(sucursales_miembro)
+                
+                # Encontrar el Miembro_Sucursal correspondiente
+                ms = next((ms for ms in self.miembro_sucursal 
+                          if ms['IDMiembro'] == miembro['IDMiembro'] and ms['IDSucursal'] == sucursal_id), None)
+                
+                if ms:
+                    # Determinar cantidad a canjear (10-50% de puntos disponibles)
+                    cantidad_canje = int(puntos_disponibles * random.uniform(0.1, 0.5))
+                    if cantidad_canje < 50:
+                        continue
+                        
+                    fecha_canje = self._random_date(self.fecha_actual - timedelta(days=180), self.fecha_actual)
+                    
+                    self.canjes.append({
+                        "IDCanje": id_canje,
+                        "Cantidad": cantidad_canje,
+                        "Fecha_canje": fecha_canje,
+                        "Descripcion": random.choice([
+                            "Canje por clase personalizada", 
+                            "Canje por merchandising", 
+                            "Descuento en mensualidad",
+                            "Canje por suplementos deportivos",
+                            "Canje por sesión de nutrición"
+                        ]),
+                        "IDMiembro_Sucursal": ms['IDMiembro_Sucursal']
+                    })
+                    
+                    id_canje += 1
+                    puntos_disponibles -= cantidad_canje
+    
+    def _generar_sesiones_virtuales(self):
+        """Genera sesiones virtuales para miembros Premium"""
+        self.sesiones_virtuales = []
+        id_sesion = 1
+        
+        # Sólo miembros con membresía Premium pueden tener sesiones virtuales
+        membresias_premium = [m for m in self.membresias if m['IDTipo_Membresia'] == 2]
+        
+        for membresia in membresias_premium:
+            # Determinar cuántas sesiones virtuales tendrá este miembro (0-10)
+            num_sesiones = random.randint(0, 10)
+            
+            for _ in range(num_sesiones):
+                fecha_inicio = self._random_date(membresia['Fecha_Inicio'], 
+                                              min(membresia['Fecha_fin'], self.fecha_actual))
+                
+                duracion = round(random.uniform(30.0, 120.0), 2)  # Duración en minutos
+                
+                self.sesiones_virtuales.append({
+                    "IDSesion": id_sesion,
+                    "FechaHora_inicio": fecha_inicio,
+                    "Duracion": duracion,
+                    "IDMembresia": membresia['IDMembresia']
+                })
+                
+                id_sesion += 1
 
     # Método principal para generar todos los datos
     def generar_datos(self):
@@ -475,6 +624,8 @@ class FitChainDataGenerator:
         self._generar_origenes()
         self._generar_punteos()
         self._generar_pagos()
+        self._generar_canjes()
+        self._generar_sesiones_virtuales()
 
     def generar_dml_por_tabla(self, directorio=''):
         """
@@ -483,8 +634,6 @@ class FitChainDataGenerator:
         Args:
             directorio (str): Directorio donde guardar los archivos (opcional)
         """
-        import os
-
         # Crear directorio si no existe
         if directorio and not os.path.exists(directorio):
             os.makedirs(directorio)
@@ -502,20 +651,41 @@ class FitChainDataGenerator:
             'Grupo',
             'Reto',
             'Membresia',
+            'Miembro_Sucursal',
             'Miembro_Grupo',
             'Reto_Grupal',
             'Miembro_reto',
             'Asistencia',
             'Origen',
             'Punteo',
-            'Pago'
+            'Pago',
+            'Canje',
+            'Sesion_virtual'
         ]
 
         # Mapeo de nombres de atributos
         mapeo_atributos = {
+            'Genero': 'genero',
+            'Tipo_Membresia': 'tipo_membresia',
+            'Estado': 'estado',
+            'Unidad_medicion': 'unidad_medicion',
+            'Pais': 'pais',
+            'Ciudad': 'ciudad',
+            'Sucursal': 'sucursales',
+            'Miembro': 'miembros',
+            'Grupo': 'grupos',
+            'Reto': 'retos',
+            'Membresia': 'membresias',
+            'Miembro_Sucursal': 'miembro_sucursal',
             'Miembro_Grupo': 'miembro_grupo',
             'Reto_Grupal': 'reto_grupal',
-            'Miembro_reto': 'miembro_reto'
+            'Miembro_reto': 'miembro_reto',
+            'Asistencia': 'asistencias',
+            'Origen': 'origenes',
+            'Punteo': 'punteos',
+            'Pago': 'pagos',
+            'Canje': 'canjes',
+            'Sesion_virtual': 'sesiones_virtuales'
         }
 
         # Generar archivos individuales
@@ -552,20 +722,41 @@ class FitChainDataGenerator:
             'Grupo',
             'Reto',
             'Membresia',
+            'Miembro_Sucursal',
             'Miembro_Grupo',
             'Reto_Grupal',
             'Miembro_reto',
             'Asistencia',
             'Origen',
             'Punteo',
-            'Pago'
+            'Pago',
+            'Canje',
+            'Sesion_virtual'
         ]
 
         # Mapeo de nombres de atributos
         mapeo_atributos = {
+            'Genero': 'genero',
+            'Tipo_Membresia': 'tipo_membresia',
+            'Estado': 'estado',
+            'Unidad_medicion': 'unidad_medicion',
+            'Pais': 'pais',
+            'Ciudad': 'ciudad',
+            'Sucursal': 'sucursales',
+            'Miembro': 'miembros',
+            'Grupo': 'grupos',
+            'Reto': 'retos',
+            'Membresia': 'membresias',
+            'Miembro_Sucursal': 'miembro_sucursal',
             'Miembro_Grupo': 'miembro_grupo',
             'Reto_Grupal': 'reto_grupal',
-            'Miembro_reto': 'miembro_reto'
+            'Miembro_reto': 'miembro_reto',
+            'Asistencia': 'asistencias',
+            'Origen': 'origenes',
+            'Punteo': 'punteos',
+            'Pago': 'pagos',
+            'Canje': 'canjes',
+            'Sesion_virtual': 'sesiones_virtuales'
         }
 
         with open(archivo_salida, 'w', encoding='utf-8') as f:
@@ -573,7 +764,6 @@ class FitChainDataGenerator:
             f.write(f"-- Script DML completo generado automáticamente para FitChain\n")
             f.write(f"-- Fecha de generación: {datetime.now()}\n")
             f.write(f"-- Total de tablas: {len(orden_tablas)}\n\n")
-
 
             # Generar INSERTs para cada tabla
             for tabla in orden_tablas:
@@ -598,7 +788,6 @@ class FitChainDataGenerator:
 
             # Escribir los INSERTs
             self._escribir_inserts(f, tabla, datos)
-
 
     def _escribir_inserts(self, file_obj, tabla, datos):
         """Escribe las sentencias INSERT para una tabla en el file_obj dado"""
@@ -634,7 +823,7 @@ class FitChainDataGenerator:
         if valor is None:
             return 'NULL'
         elif isinstance(valor, str):
-            return f"'{valor.replace("'", "''")}'"
+            return "'{}'".format(valor.replace("'", "''"))
         elif isinstance(valor, (datetime, date)):
             return f"'{valor}'"
         elif isinstance(valor, bool):
@@ -643,7 +832,6 @@ class FitChainDataGenerator:
             return str(valor)
         else:
             return f"'{str(valor)}'"
-
 
 
 if __name__ == "__main__":
