@@ -28,7 +28,8 @@ WHERE tm.Nombre = 'Premium';
 
 -- 2
 
-SELECT	s.Nombre, 
+SELECT	s.IDSucursal,
+		s.Nombre, 
 		c.Nombre AS Ciudad, 
 		COUNT(ms.IDMiembro) AS Usuarios
 FROM	Sucursal s
@@ -46,15 +47,22 @@ HAVING COUNT(*) > 1;
 
 -- 4
 
-SELECT DISTINCT mr.IDMiembro
+SELECT DISTINCT mr.IDMiembro,
+		(m.Nombre1 + ' ' +m.Apellido1) as Miembro
 FROM	Miembro_reto mr
 		JOIN Reto r ON mr.IDReto = r.IDReto
+		JOIN Miembro m ON mr.IDMiembro = m.IDMiembro
 WHERE r.IDSucursal IS NULL;  -- Reto global
 
 -- 5
 
-SELECT TOP 5 p.IDMiembro, SUM(p.Cantidad) AS Puntos
-FROM Punteo p
+SELECT TOP 5	p.IDMiembro, 
+				SUM(p.Cantidad) as [Puntos positivos],
+				SUM(c.Cantidad) as [Puntos negativos],
+				SUM(p.Cantidad) - SUM(c.Cantidad) AS Puntos
+FROM	Punteo p
+		JOIN Miembro_Sucursal ms on p.IDMiembro = ms.IDMiembro
+		JOIN Canje c on ms.IDMiembro_Sucursal = c.IDMiembro_Sucursal
 WHERE p.Fecha_vencido > GETDATE() OR p.Fecha_vencido IS NULL
 GROUP BY p.IDMiembro
 ORDER BY Puntos DESC;
@@ -71,26 +79,27 @@ JOIN Asistencia a ON mg.IDMiembro = (
 )
 WHERE a.FechaHora_Entrada >= DATEADD(DAY, -30, GETDATE())
 GROUP BY g.IDGrupo, g.Nombre
-HAVING COUNT(*) > 15;
+HAVING COUNT(distinct mg.IDMiembro) > 15;
 
 -- 7 
 
 SELECT ms.IDMiembro, COUNT(*) AS Asistencias
-FROM Asistencia a
-JOIN Miembro_Sucursal ms ON a.IDMiembro_Sucursal = ms.IDMiembro_Sucursal
+FROM	Asistencia a
+		JOIN Miembro_Sucursal ms ON a.IDMiembro_Sucursal = ms.IDMiembro_Sucursal
 WHERE a.FechaHora_Entrada >= DATEADD(DAY, -30, GETDATE())
 GROUP BY ms.IDMiembro
-HAVING COUNT(*) > 8;
+HAVING COUNT(*) > 8
+ORDER BY ms.IDMiembro;
 
 -- 8
 
-SELECT TOP 3 mr.IDMiembro, COUNT(*) AS RetosCompletados
-FROM Miembro_reto mr
-JOIN Reto r ON mr.IDReto = r.IDReto
-WHERE r.IDSucursal IS NULL  -- Reto global
-  AND mr.Fecha_completado >= DATEADD(YEAR, -1, GETDATE())
+SELECT mr.IDMiembro, COUNT(*) AS RetosCompletados
+FROM	Miembro_reto mr
+		JOIN Reto r ON mr.IDReto = r.IDReto
+WHERE	r.IDSucursal IS NULL  -- Reto global
+		 AND mr.Fecha_completado >= DATEADD(YEAR, -1, GETDATE())
 GROUP BY mr.IDMiembro
-ORDER BY RetosCompletados DESC;
+ORDER BY RetosCompletados asc;
 
 -- 9
 
@@ -161,3 +170,4 @@ JOIN Pago p ON mb.IDMembresia = p.IDMembresia
 WHERE p.Fecha_trasaccion >= DATEADD(MONTH, -12, GETDATE())
 GROUP BY s.IDSucursal, s.Nombre;
 
+--
