@@ -22,7 +22,7 @@ GO
 Ejecuta el script DDL para crear todas las tablas, restricciones y relaciones necesarias:
 
 ```
-DDL_FitChainV6.sql
+DDL_FitChainV7.sql
 ```
 
 Este script creará la estructura completa de la base de datos con todas las tablas y relaciones.
