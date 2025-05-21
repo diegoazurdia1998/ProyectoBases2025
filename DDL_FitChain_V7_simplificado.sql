@@ -78,7 +78,7 @@ CREATE TABLE Reto (
     Nombre nvarchar(150) NOT NULL,
     Descripcion nvarchar(max) NOT NULL,
     Fecha_inicio datetime NOT NULL,
-    Fecha_fin date NOT NULL,
+    Fecha_fin date NULL,
     Puntos_aganar int NOT NULL,
     Meta_cantidad decimal(6, 2) NOT NULL,
     IDUnidadMedicion smallint FOREIGN KEY REFERENCES Unidad_medicion(IDUnidadMedicion),
@@ -96,7 +96,7 @@ CREATE TABLE Origen (
 CREATE TABLE Membresia (
     IDMembresia smallint PRIMARY KEY,
     Fecha_Inicio date NOT NULL,
-    Fecha_fin date NOT NULL,
+    Fecha_fin date NULL,
     IDMiembro smallint FOREIGN KEY REFERENCES Miembro(IDMiembro),
     IDTipo_Membresia smallint FOREIGN KEY REFERENCES Tipo_Membresia(IDTipo_Membresia)
 );

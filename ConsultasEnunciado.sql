@@ -19,6 +19,7 @@
  go
 
 -- 1
+-- Listado de todos los usuarios registrados con membresía Premium 
 
 SELECT * 
 FROM	Miembro m
@@ -27,6 +28,7 @@ FROM	Miembro m
 WHERE tm.Nombre = 'Premium';
 
 -- 2
+-- Mostrar el nombre, ciudad y cantidad de usuarios registrados de todas las sucursales  
 
 SELECT	s.IDSucursal,
 		s.Nombre, 
@@ -38,6 +40,7 @@ FROM	Sucursal s
 GROUP BY s.IDSucursal, s.Nombre, c.Nombre;
 
 -- 3
+-- Obtener los usuarios registrados en más de una sucursal 
 
 SELECT	IDMiembro, 
 		COUNT(*) AS Sucursales
@@ -46,6 +49,7 @@ GROUP BY IDMiembro
 HAVING COUNT(*) > 1;
 
 -- 4
+-- Listar los usuarios que se han unido a algún reto global 
 
 SELECT DISTINCT mr.IDMiembro,
 		(m.Nombre1 + ' ' +m.Apellido1) as Miembro
@@ -63,6 +67,7 @@ JOIN Miembro_reto mr ON m.IDMiembro = mr.IDMiembro
 JOIN Reto r ON mr.IDReto = r.IDReto AND r.IDSucursal IS NULL;
 
 -- 5
+-- Top 5 usuarios con más puntos disponibles (no expirados y no canjeados) 
 
 SELECT TOP 5
     m.IDMiembro,
@@ -80,6 +85,7 @@ GROUP BY m.IDMiembro, m.Nombre1, m.Apellido1
 ORDER BY PuntosDisponibles DESC;
 
 -- 6
+-- Listado de grupos con más de 15 miembros activos durante los últimos 30 días 
 
 SELECT 
     g.IDGrupo, 
@@ -96,6 +102,7 @@ HAVING COUNT(DISTINCT a.IDMiembro_Sucursal) > 15
 ORDER BY MiembrosActivos desc;
 
 -- 7 
+-- Listado de usuarios que han asistido a algún gimnasio más de 8 veces en los últimos 30 días 
 
 SELECT 
     m.IDMiembro,
@@ -110,6 +117,7 @@ HAVING COUNT(*) > 8
 ORDER BY Asistencias DESC;-- ms.IDMiembro
 
 -- 8
+-- Top 3 usuarios con más retos globales completados durante el año pasado 
 
 SELECT TOP 3 
     mr.IDMiembro, 
@@ -119,11 +127,12 @@ FROM Miembro_reto mr
 JOIN Reto r ON mr.IDReto = r.IDReto
 JOIN Miembro m ON mr.IDMiembro = m.IDMiembro
 WHERE r.IDSucursal IS NULL  -- Reto global
-    AND datediff(day, getdate(), mr.Fecha) > 365
+	AND mr.Progreso >= 40
 GROUP BY mr.IDMiembro, m.Nombre1, m.Apellido1
 ORDER BY RetosCompletados DESC;
 
 -- 9
+-- Mostrar los líderes de grupo que llevan más de 1 año en FitChain indicando la cantidad de puntos que ha conseguido todo su equipo durante los últimos 365 días (cada miembro suma puntos para el grupo si al momento de recibirlos pertenece a este) 
 
 SELECT 
     g.IDGrupo, 
@@ -144,8 +153,8 @@ GROUP BY g.IDGrupo, g.Nombre, l.IDMiembro, l.Nombre1, l.Apellido1
 ORDER BY PuntosEquipo DESC;
 
 -- 10
+-- Listado de usuarios con membresía activa (que haya pagado su mensualidad), que tengan 3 sucursales registradas, hayan completado al menos un reto global y tengan más de 500 puntos activos. Debe mostrar código de usuario, nombres, cantidad de puntos, sucursal principal y sucursales secundarias) 
 
--- Versión compatible con versiones anteriores a SQL Server 2017
 SELECT 
     m.IDMiembro, 
     CONCAT(m.Nombre1, ' ', m.Apellido1) AS NombreCompleto,
@@ -185,6 +194,7 @@ AND (SELECT SUM(p.Cantidad)
 GROUP BY m.IDMiembro, m.Nombre1, m.Apellido1;
 
 -- 11
+-- Listado de usuarios con membresía Premium que hayan tenido al menos una asistencia este mes en su sucursal principal y al menos una asistencia en una sucursal secundaria) 
 
 SELECT DISTINCT 
     m.IDMiembro,
@@ -208,13 +218,14 @@ AND EXISTS (
 );
 
 -- 12
+-- Listado de sucursales con cantidad de usuarios registrados y monto recibido por mes durante los últimos 12 meses.
 
 SELECT 
     s.IDSucursal, 
     s.Nombre,
     COUNT(DISTINCT ms.IDMiembro) AS UsuariosRegistrados,
     SUM(CASE 
-        WHEN p.Fecha_trasaccion >= DATEADD(MONTH, DATEDIFF(MONTH, 0, DATEADD(MONTH, -11, GETDATE())), 0)
+        WHEN p.Fecha_trasaccion >= DATEADD(MONTH, DATEDIFF(MONTH, 0, DATEADD(MONTH, -12, GETDATE())), 0)
         THEN p.Monto_abonado 
         ELSE 0 
     END) AS MontoUltimos12Meses
@@ -222,6 +233,21 @@ FROM Sucursal s
 JOIN Miembro_Sucursal ms ON s.IDSucursal = ms.IDSucursal
 JOIN Membresia mb ON ms.IDMiembro = mb.IDMiembro
 JOIN Pago p ON mb.IDMembresia = p.IDMembresia
-GROUP BY s.IDSucursal, s.Nombre;
+GROUP BY s.IDSucursal, s.Nombre
+ORDER BY MontoUltimos12Meses desc;
 
 -- 
+-- Miembros que utilizan QR, Huella digital
+SELECT ta.Nombre, COUNT(*) as Conteo
+FROM Miembro_Acceso ma
+JOIN Tipo_Acceso ta on ma.IDTipoAcceso = ta.IDTipoAcceso
+GROUP BY ta.Nombre;
+
+--
+-- Cantidad de personas que se inscribieron a un reto el ultimo trimestre
+SELECT r.Nombre, COUNT(DISTINCT mr.IDMiembro) AS [Miembros asignados en el trimestre]
+FROM Miembro_reto mr
+JOIN Reto r on mr.IDReto =r.IDReto
+WHERE DATEDIFF(mm, GETDATE(), mr.Fecha_inscripcion) <= 3
+GROUP BY r.Nombre
+ORDER BY [Miembros asignados en el trimestre] DESC;

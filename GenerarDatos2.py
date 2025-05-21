@@ -635,17 +635,18 @@ class FitChainGenerator:
             for id_miembro in participantes:
                 progreso = round(random.uniform(0, 10), 2) * 10
 
-                if progreso > 90:
-                    progreso = 100
+                #if progreso > 90:
+                #    progreso = 100
 
                 completado = (progreso == 100)
+                fecha_completado = self.generar_fechas_coherentes(fecha_min=reto["Fecha_inicio"], fecha_max=datetime.now())
 
                 miembros_retos.append({
                     "IDMiembro": id_miembro,
                     "IDReto": reto["IDReto"],
                     "Progreso": progreso,
                     "Fecha_inscripcion": reto["Fecha_inicio"],
-                    "Fecha_completado": reto["Fecha_fin"] if completado else None,
+                    "Fecha_completado": fecha_completado if completado else None,
                     "IDEstado": 2 if completado else 1  # 2=Completado, 1=Activo
                 })
 
@@ -764,7 +765,7 @@ class FitChainGenerator:
                 puntos_disponibles = self.punteo[
                     (self.punteo["IDMiembro"] == ms["IDMiembro"]) &
                     (self.punteo["estaActivo"] == 1) &
-                    (self.punteo["Fecha_vencido"] >= datetime.today().date().fromtimestamp())
+                    (pd.to_datetime(self.punteo["Fecha_vencido"]) >= pd.Timestamp.now())
                     ]["Cantidad"].sum()
 
                 if puntos_disponibles > 100:  # Mínimo 100 puntos para canjear
