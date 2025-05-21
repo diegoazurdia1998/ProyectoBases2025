@@ -54,93 +54,145 @@ FROM	Miembro_reto mr
 		JOIN Miembro m ON mr.IDMiembro = m.IDMiembro
 WHERE r.IDSucursal IS NULL;  -- Reto global
 
+
+SELECT DISTINCT 
+    m.IDMiembro,
+    (m.Nombre1 + ' ' + m.Apellido1) as Miembro
+FROM Miembro m
+JOIN Miembro_reto mr ON m.IDMiembro = mr.IDMiembro
+JOIN Reto r ON mr.IDReto = r.IDReto AND r.IDSucursal IS NULL;
+
 -- 5
 
-SELECT TOP 5	p.IDMiembro, 
-				SUM(p.Cantidad) as [Puntos positivos],
-				SUM(c.Cantidad) as [Puntos negativos],
-				SUM(p.Cantidad) - SUM(c.Cantidad) AS Puntos
-FROM	Punteo p
-		JOIN Miembro_Sucursal ms on p.IDMiembro = ms.IDMiembro
-		JOIN Canje c on ms.IDMiembro_Sucursal = c.IDMiembro_Sucursal
-WHERE p.Fecha_vencido > GETDATE() OR p.Fecha_vencido IS NULL
-GROUP BY p.IDMiembro
-ORDER BY Puntos DESC;
+SELECT TOP 5
+    m.IDMiembro,
+    CONCAT(m.Nombre1, ' ', m.Apellido1) as Miembro,
+    SUM(CASE WHEN p.Fecha_vencido > GETDATE() OR p.Fecha_vencido IS NULL THEN p.Cantidad ELSE 0 END) -
+    ISNULL((
+        SELECT SUM(c.Cantidad) 
+        FROM Canje c 
+        JOIN Miembro_Sucursal ms ON c.IDMiembro_Sucursal = ms.IDMiembro_Sucursal
+        WHERE ms.IDMiembro = m.IDMiembro
+    ), 0) AS PuntosDisponibles
+FROM Miembro m
+LEFT JOIN Punteo p ON m.IDMiembro = p.IDMiembro
+GROUP BY m.IDMiembro, m.Nombre1, m.Apellido1
+ORDER BY PuntosDisponibles DESC;
 
 -- 6
 
-SELECT g.IDGrupo, g.Nombre, COUNT(distinct mg.IDMiembro) AS MiembrosActivos
-FROM Grupo g
-JOIN Miembro_Grupo mg ON g.IDGrupo = mg.IDGrupo
-JOIN Asistencia a ON mg.IDMiembro = (
-    SELECT ms.IDMiembro 
-    FROM Miembro_Sucursal ms 
-    WHERE ms.IDMiembro_Sucursal = a.IDMiembro_Sucursal
-)
-WHERE a.FechaHora_Entrada >= DATEADD(DAY, -30, GETDATE())
+SELECT 
+    g.IDGrupo, 
+    g.Nombre, 
+    COUNT(DISTINCT a.IDMiembro_Sucursal) AS MiembrosActivos
+FROM	Grupo g
+		JOIN Miembro_Grupo mg ON g.IDGrupo = mg.IDGrupo
+		JOIN Miembro_Sucursal ms ON mg.IDMiembro = ms.IDMiembro
+		JOIN Asistencia a ON ms.IDMiembro_Sucursal = a.IDMiembro_Sucursal
+WHERE	a.FechaHora_Entrada >= DATEADD(DAY, -30, GETDATE())
+		AND (mg.Fecha_salida IS NULL OR mg.Fecha_salida > GETDATE())
 GROUP BY g.IDGrupo, g.Nombre
-HAVING COUNT(distinct mg.IDMiembro) > 15;
+HAVING COUNT(DISTINCT a.IDMiembro_Sucursal) > 15
+ORDER BY MiembrosActivos desc;
 
 -- 7 
 
-SELECT ms.IDMiembro, COUNT(*) AS Asistencias
-FROM	Asistencia a
-		JOIN Miembro_Sucursal ms ON a.IDMiembro_Sucursal = ms.IDMiembro_Sucursal
+SELECT 
+    m.IDMiembro,
+    (m.Nombre1 + ' ' + m.Apellido1) as Miembro,
+    COUNT(*) AS Asistencias
+FROM Miembro m
+JOIN Miembro_Sucursal ms ON m.IDMiembro = ms.IDMiembro
+JOIN Asistencia a ON ms.IDMiembro_Sucursal = a.IDMiembro_Sucursal
 WHERE a.FechaHora_Entrada >= DATEADD(DAY, -30, GETDATE())
-GROUP BY ms.IDMiembro
+GROUP BY m.IDMiembro, m.Nombre1, m.Apellido1
 HAVING COUNT(*) > 8
-ORDER BY ms.IDMiembro;
+ORDER BY Asistencias DESC;-- ms.IDMiembro
 
 -- 8
 
-SELECT mr.IDMiembro, COUNT(*) AS RetosCompletados
-FROM	Miembro_reto mr
-		JOIN Reto r ON mr.IDReto = r.IDReto
-WHERE	r.IDSucursal IS NULL  -- Reto global
-		 AND mr.Fecha_completado >= DATEADD(YEAR, -1, GETDATE())
-GROUP BY mr.IDMiembro
-ORDER BY RetosCompletados asc;
+SELECT TOP 3 
+    mr.IDMiembro, 
+    (m.Nombre1 + ' ' + m.Apellido1) as Miembro,
+    COUNT(*) AS RetosCompletados
+FROM Miembro_reto mr
+JOIN Reto r ON mr.IDReto = r.IDReto
+JOIN Miembro m ON mr.IDMiembro = m.IDMiembro
+WHERE r.IDSucursal IS NULL  -- Reto global
+    AND datediff(day, getdate(), mr.Fecha) > 365
+GROUP BY mr.IDMiembro, m.Nombre1, m.Apellido1
+ORDER BY RetosCompletados DESC;
 
 -- 9
 
 SELECT 
-    mg.IDGrupo, 
-    mg.IDMiembro AS IDLider,
+    g.IDGrupo, 
+    g.Nombre AS NombreGrupo,
+    l.IDMiembro AS IDLider,
+    (l.Nombre1 + ' ' + l.Apellido1) AS NombreLider,
     SUM(p.Cantidad) AS PuntosEquipo
 FROM Miembro_Grupo mg
-JOIN Miembro m ON mg.IDMiembro = m.IDMiembro
-JOIN Punteo p ON mg.IDMiembro = p.IDMiembro
+JOIN Grupo g ON mg.IDGrupo = g.IDGrupo
+JOIN Miembro l ON mg.IDMiembro = l.IDMiembro
+JOIN Miembro_Grupo mgm ON g.IDGrupo = mgm.IDGrupo
+JOIN Punteo p ON mgm.IDMiembro = p.IDMiembro
+    AND p.Fecha_obtenido BETWEEN mgm.Fecha_entrada AND ISNULL(mgm.Fecha_salida, GETDATE())
 WHERE mg.esLider = 1
-  AND m.Fecha_registro <= DATEADD(YEAR, -1, GETDATE())
-  AND p.Fecha_obtenido >= DATEADD(DAY, -365, GETDATE())
-GROUP BY mg.IDGrupo, mg.IDMiembro
-ORDER BY PuntosEquipo DESC ;
+    AND l.Fecha_registro <= DATEADD(YEAR, -1, GETDATE())
+    AND p.Fecha_obtenido >= DATEADD(DAY, -365, GETDATE())
+GROUP BY g.IDGrupo, g.Nombre, l.IDMiembro, l.Nombre1, l.Apellido1
+ORDER BY PuntosEquipo DESC;
 
 -- 10
 
+-- Versión compatible con versiones anteriores a SQL Server 2017
 SELECT 
     m.IDMiembro, 
-    m.Nombre1,
-    (SELECT COUNT(*) FROM Miembro_Sucursal WHERE IDMiembro = m.IDMiembro) AS Sucursales,
-    (SELECT SUM(p.Cantidad) FROM Punteo p WHERE p.IDMiembro = m.IDMiembro AND (p.Fecha_vencido > GETDATE() OR p.Fecha_vencido IS NULL)) AS Puntos
+    CONCAT(m.Nombre1, ' ', m.Apellido1) AS NombreCompleto,
+    (SELECT SUM(p.Cantidad) 
+     FROM Punteo p 
+     WHERE p.IDMiembro = m.IDMiembro 
+     AND (p.Fecha_vencido > GETDATE() OR p.Fecha_vencido IS NULL)) AS Puntos,
+    (SELECT TOP 1 s.Nombre 
+     FROM Miembro_Sucursal ms 
+     JOIN Sucursal s ON ms.IDSucursal = s.IDSucursal
+     WHERE ms.IDMiembro = m.IDMiembro AND ms.esPrincipal = 1) AS SucursalPrincipal,
+    STUFF((
+        SELECT ', ' + s.Nombre
+        FROM Miembro_Sucursal ms
+        JOIN Sucursal s ON ms.IDSucursal = s.IDSucursal
+        WHERE ms.IDMiembro = m.IDMiembro AND ms.esPrincipal = 0
+        FOR XML PATH('')
+    ), 1, 2, '') AS SucursalesSecundarias
 FROM Miembro m
-WHERE EXISTS (
+WHERE
+EXISTS (
+    SELECT 1 FROM Membresia mb
+    JOIN Pago p ON mb.IDMembresia = p.IDMembresia
+    WHERE mb.IDMiembro = m.IDMiembro
+    AND p.Fecha_trasaccion >= DATEADD(MONTH, -1, GETDATE())
+)
+AND (SELECT COUNT(*) FROM Miembro_Sucursal WHERE IDMiembro = m.IDMiembro) = 3
+AND EXISTS (
     SELECT 1 FROM Miembro_reto mr
     JOIN Reto r ON mr.IDReto = r.IDReto
     WHERE mr.IDMiembro = m.IDMiembro AND r.IDSucursal IS NULL
 )
-AND (SELECT COUNT(*) FROM Miembro_Sucursal WHERE IDMiembro = m.IDMiembro) = 3
-AND (SELECT SUM(p.Cantidad) FROM Punteo p WHERE p.IDMiembro = m.IDMiembro AND (p.Fecha_vencido > GETDATE() OR p.Fecha_vencido IS NULL)) > 500
-ORDER BY Puntos DESC;
+AND (SELECT SUM(p.Cantidad) 
+     FROM Punteo p 
+     WHERE p.IDMiembro = m.IDMiembro 
+     AND (p.Fecha_vencido > GETDATE() OR p.Fecha_vencido IS NULL)) > 500
+GROUP BY m.IDMiembro, m.Nombre1, m.Apellido1;
 
 -- 11
 
-SELECT DISTINCT m.IDMiembro
+SELECT DISTINCT 
+    m.IDMiembro,
+    m.Nombre1 + ' ' + m.Apellido1 AS NombreCompleto
 FROM Miembro m
 JOIN Membresia mb ON m.IDMiembro = mb.IDMiembro
-JOIN Tipo_Membresia tm ON mb.IDTipo_Membresia = tm.IDTipo_Membresia
-WHERE tm.Nombre = 'Premium'
-AND EXISTS (
+JOIN Tipo_Membresia tm ON mb.IDTipo_Membresia = tm.IDTipo_Membresia AND tm.Nombre = 'Premium'
+WHERE EXISTS (
     SELECT 1 
     FROM Asistencia a
     JOIN Miembro_Sucursal ms ON a.IDMiembro_Sucursal = ms.IDMiembro_Sucursal
@@ -153,8 +205,7 @@ AND EXISTS (
     JOIN Miembro_Sucursal ms ON a.IDMiembro_Sucursal = ms.IDMiembro_Sucursal
     WHERE ms.IDMiembro = m.IDMiembro AND ms.esPrincipal = 0
     AND a.FechaHora_Entrada >= DATEADD(MONTH, DATEDIFF(MONTH, 0, GETDATE()), 0)
-)
-ORDER BY M.IDMiembro DESC;
+);
 
 -- 12
 
@@ -162,12 +213,15 @@ SELECT
     s.IDSucursal, 
     s.Nombre,
     COUNT(DISTINCT ms.IDMiembro) AS UsuariosRegistrados,
-    SUM(p.Monto_abonado) AS MontoTotal
+    SUM(CASE 
+        WHEN p.Fecha_trasaccion >= DATEADD(MONTH, DATEDIFF(MONTH, 0, DATEADD(MONTH, -11, GETDATE())), 0)
+        THEN p.Monto_abonado 
+        ELSE 0 
+    END) AS MontoUltimos12Meses
 FROM Sucursal s
 JOIN Miembro_Sucursal ms ON s.IDSucursal = ms.IDSucursal
 JOIN Membresia mb ON ms.IDMiembro = mb.IDMiembro
 JOIN Pago p ON mb.IDMembresia = p.IDMembresia
-WHERE p.Fecha_trasaccion >= DATEADD(MONTH, -12, GETDATE())
 GROUP BY s.IDSucursal, s.Nombre;
 
---
+-- 

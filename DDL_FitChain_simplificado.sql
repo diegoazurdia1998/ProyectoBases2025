@@ -1,5 +1,8 @@
-USE [FitChain]
+
+USE [FitChain2]
 GO
+
+
 
 CREATE TABLE [dbo].[Pais](
     [IDPais] [smallint] NOT NULL,
@@ -170,7 +173,7 @@ CREATE TABLE [dbo].[Punteo](
 GO
 
 CREATE TABLE [dbo].[Asistencia](
-    [IDAsistencia] [smallint] NOT NULL,
+    [IDAsistencia] [int] NOT NULL,
     [IDMiembro_Sucursal] [smallint] NOT NULL,
     [FechaHora_Entrada] [datetime] NOT NULL,
     [FechaHora_Salida] [datetime] NOT NULL,
